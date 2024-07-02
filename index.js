@@ -1,15 +1,27 @@
 import { createTask, updateTask } from './lib/clickup.js';
 import { client } from './lib/sanity.js';
-
 import express from 'express';
-const app = express();
-const port = 3000;
+import cors from 'cors';
 
-app.post('/clickup', sendToClickup)
+const app = express();
+const port = process.env.PORT || 8080;
+
+app.use(cors());
+app.use(express.json());
+
+app.post('/clickup', sendToClickup);
+
+app.get('/', (req, res) => {
+    res.send("Hello World")
+})
+
+app.listen(port, () => {
+    console.log(`Serhant Request app listening on port ${port}`);
+});
 
 async function sendToClickup(request, response) {
     console.log('This is working!!!!');
-    const { entries, attachments, form, services, user, regionEmbed } = await request.json();    
+    const { entries, attachments, form, services, user, regionEmbed } = request.body;    
 
     // deduplicate entries with multiple values
 
