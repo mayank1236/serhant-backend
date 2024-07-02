@@ -1,14 +1,19 @@
-import { createTask, updateTask } from '../../../../lib/clickup';
-import { client } from '../../../../sanity/lib/client';
-import { NextRequest } from 'next/server';
+import { createTask, updateTask } from './lib/clickup.js';
+import { client } from './lib/sanity.js';
 
-export async function POST(request: NextRequest) {
+import express from 'express';
+const app = express();
+const port = 3000;
+
+app.post('/clickup', sendToClickup)
+
+async function sendToClickup(request, response) {
     console.log('This is working!!!!');
     const { entries, attachments, form, services, user, regionEmbed } = await request.json();    
 
     // deduplicate entries with multiple values
 
-    const merged = Object.values(entries.reduce((item: any, { id, value }) => {
+    const merged = Object.values(entries.reduce((item, { id, value }) => {
         item[id] ??= { id: id, value: [] };
         if (Array.isArray(value)) {
             item[id].value = item[id].value.concat(value);
@@ -19,14 +24,14 @@ export async function POST(request: NextRequest) {
         return item;
     }, {}))
 
-    merged.forEach((item: any, i) => {
-        const val: any = Object.values(item)
+    merged.forEach((item, i) => {
+        const val = Object.values(item)
         if (val[1].length === 1) {
             merged[i] = { id: val[0], value: val[1][0] }
         }
     })
 
-    const description = merged.map((item: any) => {
+    const description = merged.map((item) => {
         return `${item.id}:  ${item.value}`
     }).join('\n')
 
@@ -38,7 +43,7 @@ export async function POST(request: NextRequest) {
         description,
     );
 
-    await task.custom_fields.forEach(async (field: any) => {
+    await task.custom_fields.forEach(async (field) => {
         // const user = JSON.parse(cookies().get('msalUser').value);
 
         switch (field.name) {
@@ -54,13 +59,13 @@ export async function POST(request: NextRequest) {
                 return;
         }
 
-        const fieldValue = merged.find((formField: any) => formField.id.toLowerCase().replace(/\s+|[ :\-_]/g, "") == field.name.toLowerCase().replace(/\s+|[ :\-_]/g, ""))?.value;
+        const fieldValue = merged.find((formField) => formField.id.toLowerCase().replace(/\s+|[ :\-_]/g, "") == field.name.toLowerCase().replace(/\s+|[ :\-_]/g, ""))?.value;
         fieldValue && await updateTask(task.id, field.id, fieldValue);
     })
     // submit attachments to task
 
     if (attachments.length > 0 && task) {
-        attachments.forEach(async (item: any, index: any) => {
+        attachments.forEach(async (item, index) => {
             // Extract base64 data
             const base64Data = item.data.split(',')[1]
 
@@ -86,9 +91,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             taskId: task.id
         })  
-        return new Response('Submitted to clickup!', {
-            status: 200,
-        })
+        return response.send('Submitted to clickup!')
     } else {
         console.log('Error Creating Task');
     }
