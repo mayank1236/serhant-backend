@@ -2,6 +2,7 @@ import { createTask, updateTask } from './lib/clickup.js';
 import { client } from './lib/sanity.js';
 import express from 'express';
 import cors from 'cors';
+import { sentToSheet } from './lib/sheetsapi.js';
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -15,6 +16,8 @@ app.post('/clickup', sendToClickup);
 app.get('/', (req, res) => {
     res.send("Hello World")
 })
+
+app.post('/sheets', sendToSheets);
 
 app.listen(port, () => {
     console.log(`Serhant Request app listening on port ${port}`);
@@ -108,4 +111,47 @@ async function sendToClickup(request, response) {
     } else {
         console.log('Error Creating Task');
     }
+}
+
+async function sendToSheets(request, response) {
+    const {data, attachments, title, form} = request.body;   
+    let formData = {};
+    const google_sheet_name = "Requests";
+    const google_sheet_id = "1btLPzS18mdTNPLaOb4XzkPCiXnbufad2Gl0yrD6D6RQ";
+
+    formData['title'] = 'Form Name: ' + title;
+    formData['Clickup List Id'] = 'Clickup List Id: ' + form.clickupListId;
+    formData['Clickup Task Template'] = 'Clickup Task Template Name: ' + form.taskTemplate;
+
+    if(data.length >= 1) {        
+
+        data.forEach((d, id) => {
+            const name = id;
+            const value = d.id + ': ' +d.value;
+            if (formData[name]) {
+                formData[name] = Array.isArray(formData[name])
+                    ? [...formData[name], value]
+                    : [formData[name], value];
+            } else {
+                formData[name] = value;
+            }
+        });
+        
+        if (attachments.length > 0) {
+            formData.attachments = attachments.map((item) => {
+              return {
+                name: item.name,
+                data: item.data, // Assuming data is base64 string
+                type: item.type || 'image/png',
+              };
+            });
+        }
+    
+        
+        if(google_sheet_name && google_sheet_id) {
+            await sentToSheet(formData, google_sheet_id, google_sheet_name)
+        }
+    }
+
+    return response.send('Submitted to Google Sheets!')
 }
